@@ -24,7 +24,7 @@ use crate::shared::{
 };
 use crate::transport_parameters::TransportParameters;
 use crate::{
-    Side, Transmit, TransportError, LOC_CID_COUNT, MAX_CID_SIZE, MIN_INITIAL_SIZE,
+    ConnectionError, Side, Transmit, TransportError, LOC_CID_COUNT, MAX_CID_SIZE, MIN_INITIAL_SIZE,
     RESET_TOKEN_SIZE, VERSION,
 };
 
@@ -289,7 +289,15 @@ where
             let header_crypto = crypto.header_keys();
             return match first_decode.finish(Some(&header_crypto)) {
                 Ok(packet) => self
-                    .handle_initial(now, remote, ecn, packet, remaining, &crypto, &header_crypto)
+                    .handle_first_packet(
+                        now,
+                        remote,
+                        ecn,
+                        packet,
+                        remaining,
+                        &crypto,
+                        &header_crypto,
+                    )
                     .map(|(ch, conn)| (ch, DatagramEvent::NewConnection(conn))),
                 Err(e) => {
                     trace!("unable to decode initial packet: {}", e);
@@ -470,7 +478,7 @@ where
         Ok((ch, conn))
     }
 
-    fn handle_initial(
+    fn handle_first_packet(
         &mut self,
         now: Instant,
         remote: SocketAddr,
@@ -614,7 +622,7 @@ where
         if dst_cid.len() != 0 {
             self.connection_ids_initial.insert(dst_cid, ch);
         }
-        match conn.handle_initial(now, remote, ecn, packet_number as u64, packet, rest) {
+        match conn.handle_first_packet(now, remote, ecn, packet_number as u64, packet, rest) {
             Ok(()) => {
                 trace!(id = ch.0, icid = %dst_cid, "connection incoming");
                 self.incoming_handshakes += 1;
@@ -623,11 +631,20 @@ where
             Err(e) => {
                 debug!("handshake failed: {}", e);
                 self.handle_event(ch, EndpointEvent(EndpointEventInner::Drained));
-                self.transmits.push_back(Transmit {
-                    destination: remote,
-                    ecn: None,
-                    contents: initial_close(crypto, header_crypto, &src_cid, &temp_loc_cid, 0, e),
-                });
+                if let ConnectionError::TransportError(e) = e {
+                    self.transmits.push_back(Transmit {
+                        destination: remote,
+                        ecn: None,
+                        contents: initial_close(
+                            crypto,
+                            header_crypto,
+                            &src_cid,
+                            &temp_loc_cid,
+                            0,
+                            e,
+                        ),
+                    });
+                }
                 None
             }
         }
