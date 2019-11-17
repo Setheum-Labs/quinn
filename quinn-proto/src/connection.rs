@@ -12,10 +12,7 @@ use tracing::{debug, error, info, trace, trace_span, warn};
 use crate::coding::BufMutExt;
 use crate::crypto::{self, HeaderKeys, Keys};
 use crate::frame::{Close, Datagram, FrameStruct};
-use crate::packet::{
-    Header, LongType, Packet, PacketNumber, PartialDecode, SpaceId, LONG_RESERVED_BITS,
-    SHORT_RESERVED_BITS,
-};
+use crate::packet::{Header, LongType, Packet, PacketNumber, PartialDecode, SpaceId};
 use crate::range_set::RangeSet;
 use crate::shared::{
     ConnectionEvent, ConnectionEventInner, ConnectionId, EcnCodepoint, EndpointConfig,
@@ -2808,11 +2805,7 @@ where
             }
         }
 
-        let reserved = match packet.header {
-            Header::Short { .. } => SHORT_RESERVED_BITS,
-            _ => LONG_RESERVED_BITS,
-        };
-        if packet.header_data[0] & reserved != 0 {
+        if !packet.reserved_bits_valid() {
             return Err(Some(TransportError::PROTOCOL_VIOLATION(
                 "reserved bits set",
             )));
