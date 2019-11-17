@@ -209,9 +209,10 @@ impl TransportConfig {
 pub struct EndpointConfig {
     /// Length of connection IDs for the endpoint.
     ///
-    /// This must be either 0 or between 4 and 18 inclusive. The length of the local connection IDs
-    /// constrains the amount of simultaneous connections the endpoint can maintain. The API user is
-    /// responsible for making sure that the pool is large enough to cover the intended usage.
+    /// This must be no greater than 20. If zero, incoming packets are mapped to connections only by
+    /// their source address. Otherwise, the connection ID field is used alone, allowing for source
+    /// address to change and for multiple connections from a single address. Settings of 1 or 2 may
+    /// slow or prevent processing of large numbers of connections.
     pub local_cid_len: usize,
 
     /// Private key used to send authenticated connection resets to peers who were
