@@ -2835,9 +2835,7 @@ where
                     .as_ref()
                     .map_or(false, |x| x.update_unacked)
             {
-                return Err(Some(TransportError::PROTOCOL_VIOLATION(
-                    "illegal key update",
-                )));
+                return Err(Some(TransportError::KEY_UPDATE_ERROR("")));
             }
             trace!("key update authenticated");
             self.update_keys(Some((number, now)), true);
